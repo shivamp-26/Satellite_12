@@ -1,5 +1,5 @@
-import { useRef, useMemo, useEffect, useState } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { useRef, useEffect, useState, useMemo } from 'react';
+import { Canvas, useFrame, useThree, useLoader } from '@react-three/fiber';
 import { OrbitControls, Stars, Line, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { SatelliteData, calculateOrbitPath } from '@/lib/satellite-utils';
@@ -16,235 +16,93 @@ interface Earth3DEnhancedProps {
 }
 
 const EARTH_RADIUS = 6.371;
+// Earth's sidereal rotation period is ~23h 56m = 86164 seconds
+// We accelerate it for visualization (1 real second = 60 simulated seconds)
+const EARTH_ROTATION_SPEED = (2 * Math.PI) / 86164 * 60;
+const CLOUD_ROTATION_SPEED = EARTH_ROTATION_SPEED * 1.1; // Clouds move slightly faster
 
 function Earth() {
   const meshRef = useRef<THREE.Mesh>(null);
   const cloudsRef = useRef<THREE.Mesh>(null);
-  const atmosphereRef = useRef<THREE.Mesh>(null);
+  const nightRef = useRef<THREE.Mesh>(null);
   
-  // Create realistic Earth texture
-  const earthTexture = useMemo(() => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 2048;
-    canvas.height = 1024;
-    const ctx = canvas.getContext('2d')!;
-    
-    // Deep ocean base with realistic gradient
-    const oceanGradient = ctx.createLinearGradient(0, 0, 0, 1024);
-    oceanGradient.addColorStop(0, '#0c1a2e');
-    oceanGradient.addColorStop(0.3, '#0a2540');
-    oceanGradient.addColorStop(0.5, '#0d3050');
-    oceanGradient.addColorStop(0.7, '#0a2540');
-    oceanGradient.addColorStop(1, '#0c1a2e');
-    ctx.fillStyle = oceanGradient;
-    ctx.fillRect(0, 0, 2048, 1024);
-    
-    // Add ocean depth variation
-    for (let i = 0; i < 50; i++) {
-      const x = Math.random() * 2048;
-      const y = Math.random() * 1024;
-      const r = Math.random() * 200 + 50;
-      const gradient = ctx.createRadialGradient(x, y, 0, x, y, r);
-      gradient.addColorStop(0, 'rgba(10, 40, 70, 0.3)');
-      gradient.addColorStop(1, 'transparent');
-      ctx.fillStyle = gradient;
-      ctx.fillRect(x - r, y - r, r * 2, r * 2);
-    }
-    
-    // Continents with realistic coloring
-    const drawContinent = (points: number[][], baseColor: string, highlightColor: string) => {
-      ctx.beginPath();
-      ctx.moveTo(points[0][0], points[0][1]);
-      for (let i = 1; i < points.length; i++) {
-        ctx.lineTo(points[i][0], points[i][1]);
-      }
-      ctx.closePath();
-      
-      const gradient = ctx.createRadialGradient(
-        points[0][0], points[0][1], 0,
-        points[0][0], points[0][1], 300
-      );
-      gradient.addColorStop(0, highlightColor);
-      gradient.addColorStop(1, baseColor);
-      ctx.fillStyle = gradient;
-      ctx.fill();
-    };
-    
-    // North America
-    drawContinent([
-      [150, 80], [300, 100], [380, 180], [350, 280], [280, 320],
-      [200, 300], [150, 250], [100, 180], [120, 120]
-    ], '#1a4a35', '#2d6b4a');
-    
-    // South America
-    drawContinent([
-      [280, 340], [340, 360], [360, 450], [340, 550], [300, 620],
-      [260, 580], [250, 480], [260, 400]
-    ], '#1f5540', '#2a6b52');
-    
-    // Europe
-    drawContinent([
-      [480, 100], [600, 80], [650, 120], [620, 200], [550, 220],
-      [500, 200], [470, 150]
-    ], '#2a5545', '#3a7060');
-    
-    // Africa
-    drawContinent([
-      [500, 240], [600, 220], [680, 280], [700, 400], [660, 520],
-      [580, 550], [520, 480], [500, 380], [480, 300]
-    ], '#3d5a40', '#4d7050');
-    
-    // Asia
-    drawContinent([
-      [650, 100], [900, 80], [1000, 120], [1050, 200], [1000, 280],
-      [900, 320], [800, 300], [700, 260], [680, 180], [700, 120]
-    ], '#2a5040', '#3a6555');
-    
-    // India
-    drawContinent([
-      [780, 280], [840, 260], [860, 340], [820, 400], [780, 380], [760, 320]
-    ], '#355545', '#457055');
-    
-    // Southeast Asia
-    drawContinent([
-      [880, 300], [950, 280], [980, 340], [940, 420], [880, 400], [860, 350]
-    ], '#2d5842', '#3d7058');
-    
-    // Australia
-    drawContinent([
-      [920, 480], [1020, 460], [1080, 500], [1060, 580], [980, 620],
-      [920, 580], [900, 520]
-    ], '#4a5535', '#5a6545');
-    
-    // Antarctica
-    ctx.fillStyle = '#e8f0f8';
-    ctx.beginPath();
-    ctx.ellipse(1024, 980, 800, 120, 0, 0, Math.PI * 2);
-    ctx.fill();
-    
-    // Arctic
-    ctx.fillStyle = '#dde8f0';
-    ctx.beginPath();
-    ctx.ellipse(1024, 30, 600, 80, 0, 0, Math.PI * 2);
-    ctx.fill();
-    
-    // Mountain ranges (lighter areas)
-    const drawMountains = (x: number, y: number, w: number, h: number) => {
-      ctx.fillStyle = 'rgba(80, 90, 70, 0.4)';
-      ctx.beginPath();
-      ctx.ellipse(x, y, w, h, Math.random() * Math.PI, 0, Math.PI * 2);
-      ctx.fill();
-    };
-    
-    // Rockies
-    drawMountains(200, 200, 20, 80);
-    // Andes
-    drawMountains(300, 480, 15, 120);
-    // Alps
-    drawMountains(540, 180, 30, 15);
-    // Himalayas
-    drawMountains(820, 240, 60, 20);
-    
-    // City lights effect (night side would show these)
-    ctx.fillStyle = 'rgba(255, 220, 150, 0.6)';
-    const cityLocations = [
-      [200, 220], [280, 200], [180, 280], // North America
-      [300, 420], [320, 500], // South America
-      [530, 160], [560, 180], [600, 150], // Europe
-      [540, 320], [580, 400], // Africa
-      [800, 200], [850, 220], [900, 180], [780, 320], // Asia
-      [960, 520], [1000, 540], // Australia
-    ];
-    
-    cityLocations.forEach(([x, y]) => {
-      for (let i = 0; i < 5; i++) {
-        ctx.beginPath();
-        ctx.arc(x + Math.random() * 20 - 10, y + Math.random() * 20 - 10, Math.random() * 3 + 1, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    });
-    
-    return new THREE.CanvasTexture(canvas);
-  }, []);
+  // Load real NASA textures
+  const [dayTexture, bumpTexture, specularTexture, nightTexture, cloudTexture] = useLoader(
+    THREE.TextureLoader,
+    [
+      '/textures/earth-blue-marble.jpg',
+      '/textures/earth-bump.png',
+      '/textures/earth-specular.png',
+      '/textures/earth-night.jpg',
+      '/textures/earth-clouds.png',
+    ]
+  );
   
-  // Cloud layer texture
-  const cloudTexture = useMemo(() => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 2048;
-    canvas.height = 1024;
-    const ctx = canvas.getContext('2d')!;
-    
-    ctx.fillStyle = 'transparent';
-    ctx.fillRect(0, 0, 2048, 1024);
-    
-    // Generate cloud patterns
-    for (let i = 0; i < 200; i++) {
-      const x = Math.random() * 2048;
-      const y = Math.random() * 1024;
-      const r = Math.random() * 100 + 30;
-      const opacity = Math.random() * 0.3 + 0.1;
-      
-      const gradient = ctx.createRadialGradient(x, y, 0, x, y, r);
-      gradient.addColorStop(0, `rgba(255, 255, 255, ${opacity})`);
-      gradient.addColorStop(0.5, `rgba(255, 255, 255, ${opacity * 0.5})`);
-      gradient.addColorStop(1, 'transparent');
-      ctx.fillStyle = gradient;
-      ctx.beginPath();
-      ctx.arc(x, y, r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    
-    return new THREE.CanvasTexture(canvas);
-  }, []);
-  
-  useFrame((state) => {
-    const time = state.clock.getElapsedTime();
+  useFrame((state, delta) => {
+    // Realistic Earth rotation (accelerated for visualization)
     if (meshRef.current) {
-      meshRef.current.rotation.y = time * 0.02;
+      meshRef.current.rotation.y += EARTH_ROTATION_SPEED * delta;
     }
     if (cloudsRef.current) {
-      cloudsRef.current.rotation.y = time * 0.025;
+      cloudsRef.current.rotation.y += CLOUD_ROTATION_SPEED * delta;
+    }
+    if (nightRef.current) {
+      nightRef.current.rotation.y += EARTH_ROTATION_SPEED * delta;
     }
   });
   
   return (
     <group>
-      {/* Earth sphere */}
+      {/* Earth day side with real textures */}
       <mesh ref={meshRef}>
         <sphereGeometry args={[EARTH_RADIUS, 128, 128]} />
         <meshPhongMaterial 
-          map={earthTexture}
-          shininess={15}
-          specular={new THREE.Color(0x333333)}
+          map={dayTexture}
+          bumpMap={bumpTexture}
           bumpScale={0.05}
+          specularMap={specularTexture}
+          specular={new THREE.Color(0x333333)}
+          shininess={25}
         />
       </mesh>
       
-      {/* Cloud layer */}
+      {/* Earth night side (city lights) - rendered on back side */}
+      <mesh ref={nightRef}>
+        <sphereGeometry args={[EARTH_RADIUS * 1.001, 128, 128]} />
+        <meshBasicMaterial 
+          map={nightTexture}
+          transparent
+          opacity={0.8}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
+      </mesh>
+      
+      {/* Cloud layer with real texture */}
       <mesh ref={cloudsRef}>
-        <sphereGeometry args={[EARTH_RADIUS * 1.008, 64, 64]} />
+        <sphereGeometry args={[EARTH_RADIUS * 1.01, 64, 64]} />
         <meshPhongMaterial 
           map={cloudTexture}
           transparent
-          opacity={0.8}
+          opacity={0.4}
           depthWrite={false}
         />
       </mesh>
       
       {/* Inner atmosphere glow */}
-      <mesh ref={atmosphereRef}>
-        <sphereGeometry args={[EARTH_RADIUS * 1.02, 64, 64]} />
+      <mesh>
+        <sphereGeometry args={[EARTH_RADIUS * 1.025, 64, 64]} />
         <meshBasicMaterial 
           color="#4da6ff"
           transparent
-          opacity={0.1}
+          opacity={0.08}
           side={THREE.BackSide}
         />
       </mesh>
       
-      {/* Outer atmosphere glow - blue haze */}
+      {/* Outer atmosphere glow - realistic blue haze */}
       <mesh>
-        <sphereGeometry args={[EARTH_RADIUS * 1.12, 64, 64]} />
+        <sphereGeometry args={[EARTH_RADIUS * 1.15, 64, 64]} />
         <shaderMaterial
           transparent
           side={THREE.BackSide}
@@ -254,31 +112,18 @@ function Earth() {
           }}
           vertexShader={`
             varying vec3 vNormal;
-            varying vec3 vPosition;
             void main() {
               vNormal = normalize(normalMatrix * normal);
-              vPosition = position;
               gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
             }
           `}
           fragmentShader={`
             varying vec3 vNormal;
             void main() {
-              float intensity = pow(0.65 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.0);
-              gl_FragColor = vec4(0.3, 0.65, 1.0, intensity * 0.4);
+              float intensity = pow(0.6 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.0);
+              gl_FragColor = vec4(0.3, 0.6, 1.0, intensity * 0.35);
             }
           `}
-        />
-      </mesh>
-      
-      {/* Subtle grid overlay */}
-      <mesh>
-        <sphereGeometry args={[EARTH_RADIUS * 1.003, 72, 36]} />
-        <meshBasicMaterial 
-          color="#4da6ff"
-          wireframe
-          transparent
-          opacity={0.02}
         />
       </mesh>
     </group>
