@@ -1,0 +1,120 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    --background: 222 47% 4%;
+    --foreground: 200 100% 95%;
+
+    --card: 222 47% 6%;
+    --card-foreground: 200 100% 95%;
+
+    --popover: 222 47% 6%;
+    --popover-foreground: 200 100% 95%;
+
+    --primary: 189 97% 55%;
+    --primary-foreground: 222 47% 4%;
+
+    --secondary: 262 83% 58%;
+    --secondary-foreground: 200 100% 95%;
+
+    --muted: 222 30% 12%;
+    --muted-foreground: 200 15% 65%;
+
+    --accent: 189 97% 55%;
+    --accent-foreground: 222 47% 4%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 200 100% 95%;
+
+    --success: 142 76% 36%;
+    --success-foreground: 200 100% 95%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 222 47% 4%;
+
+    --border: 222 30% 15%;
+    --input: 222 30% 15%;
+    --ring: 189 97% 55%;
+
+    --radius: 0.75rem;
+
+    --gradient-cosmic: linear-gradient(135deg, hsl(262 83% 58% / 0.2), hsl(222 47% 4%), hsl(189 97% 55% / 0.1));
+    --gradient-glow: linear-gradient(90deg, transparent, hsl(189 97% 55% / 0.3), transparent);
+    --glow-cyan: 0 0 20px hsl(189 97% 55% / 0.5), 0 0 40px hsl(189 97% 55% / 0.3);
+    --glow-purple: 0 0 20px hsl(262 83% 58% / 0.5), 0 0 40px hsl(262 83% 58% / 0.3);
+    
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .dark {
+    --background: 222 47% 4%;
+    --foreground: 200 100% 95%;
+
+    --card: 222 47% 6%;
+    --card-foreground: 200 100% 95%;
+
+    --popover: 222 47% 6%;
+    --popover-foreground: 200 100% 95%;
+
+    --primary: 189 97% 55%;
+    --primary-foreground: 222 47% 4%;
+
+    --secondary: 262 83% 58%;
+    --secondary-foreground: 200 100% 95%;
+
+    --muted: 222 30% 12%;
+    --muted-foreground: 200 15% 65%;
+
+    --accent: 189 97% 55%;
+    --accent-foreground: 222 47% 4%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 200 100% 95%;
+
+    --success: 142 76% 36%;
+    --success-foreground: 200 100% 95%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 222 47% 4%;
+
+    --border: 222 30% 15%;
+    --input: 222 30% 15%;
+    --ring: 189 97% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    background: var(--gradient-cosmic);
+    background-attachment: fixed;
+  }
+}
+
+@layer utilities {
+  .glow-cyan {
+    box-shadow: var(--glow-cyan);
+  }
+  
+  .glow-purple {
+    box-shadow: var(--glow-purple);
+  }
+  
+  .transition-smooth {
+    transition: var(--transition-smooth);
+  }
+  
+  .gradient-glow {
+    background: var(--gradient-glow);
+  }
+}
