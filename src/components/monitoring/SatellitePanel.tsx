@@ -1,7 +1,8 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Satellite, Globe, Clock, Compass, ArrowUp, ArrowDown } from "lucide-react";
+import { Satellite, Globe, Clock, Compass, ArrowUp, ArrowDown, Flag, Rocket, Target } from "lucide-react";
 import { SatelliteData } from "@/lib/satellite-utils";
+import { getCountryFlag } from "@/lib/satellite-database";
 
 interface SatellitePanelProps {
   satellite: SatelliteData | null;
@@ -24,6 +25,8 @@ export default function SatellitePanel({ satellite }: SatellitePanelProps) {
     );
   }
 
+  const countryFlag = getCountryFlag(satellite.country || '');
+
   return (
     <Card className="p-6 bg-card/50 backdrop-blur-sm border-border">
       <div className="flex items-center justify-between mb-4">
@@ -42,17 +45,44 @@ export default function SatellitePanel({ satellite }: SatellitePanelProps) {
       </div>
 
       <div className="space-y-4">
-        {/* Basic Info */}
+        {/* Country & Launch Info */}
         <div className="grid grid-cols-2 gap-3">
           <div className="p-3 rounded-lg bg-muted/30 border border-border">
-            <p className="text-xs text-muted-foreground mb-1">Country</p>
-            <p className="font-semibold text-sm">{satellite.country || 'Unknown'}</p>
+            <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+              <Flag className="w-3 h-3" /> Country
+            </p>
+            <p className="font-semibold text-sm flex items-center gap-2">
+              <span className="text-lg">{countryFlag}</span>
+              {satellite.country || 'Unknown'}
+            </p>
           </div>
           <div className="p-3 rounded-lg bg-muted/30 border border-border">
-            <p className="text-xs text-muted-foreground mb-1">Launch Date</p>
+            <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+              <Rocket className="w-3 h-3" /> Launch Date
+            </p>
             <p className="font-semibold text-sm">{satellite.launchDate || 'Unknown'}</p>
           </div>
         </div>
+
+        {/* Purpose & Operator */}
+        {(satellite.purpose || satellite.operator) && (
+          <div className="grid grid-cols-1 gap-3">
+            {satellite.purpose && (
+              <div className="p-3 rounded-lg bg-muted/30 border border-border">
+                <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                  <Target className="w-3 h-3" /> Purpose
+                </p>
+                <p className="font-semibold text-sm">{satellite.purpose}</p>
+              </div>
+            )}
+            {satellite.operator && (
+              <div className="p-3 rounded-lg bg-muted/30 border border-border">
+                <p className="text-xs text-muted-foreground mb-1">Operator</p>
+                <p className="font-semibold text-sm">{satellite.operator}</p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Current Position */}
         <div>
@@ -107,6 +137,26 @@ export default function SatellitePanel({ satellite }: SatellitePanelProps) {
             </div>
           </div>
         </div>
+
+        {/* Launch Info */}
+        {(satellite.launchSite || satellite.launchVehicle) && (
+          <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
+            <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
+              <Rocket className="w-4 h-4 text-primary" />
+              Launch Details
+            </h4>
+            {satellite.launchSite && (
+              <p className="text-xs text-muted-foreground">
+                Site: <span className="text-foreground">{satellite.launchSite}</span>
+              </p>
+            )}
+            {satellite.launchVehicle && (
+              <p className="text-xs text-muted-foreground">
+                Vehicle: <span className="text-foreground">{satellite.launchVehicle}</span>
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Velocity */}
         {satellite.velocity && (

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Satellite, Loader2 } from "lucide-react";
@@ -9,6 +9,7 @@ import CollisionPanel from "@/components/monitoring/CollisionPanel";
 import OrbitFilter from "@/components/monitoring/OrbitFilter";
 import StatsOverlay from "@/components/monitoring/StatsOverlay";
 import SatelliteSearch from "@/components/monitoring/SatelliteSearch";
+import TimeControl from "@/components/monitoring/TimeControl";
 import {
   SatelliteData,
   initializeSatellite,
@@ -20,6 +21,7 @@ import {
   detectRealTimeCollisions, 
   predictCollisions24Hours 
 } from "@/lib/collision-detector";
+import { loadSatelliteDatabase, getSatelliteMetadata } from "@/lib/satellite-database";
 
 export default function Monitoring() {
   const [allSatellites, setAllSatellites] = useState<SatelliteData[]>([]);
@@ -30,21 +32,34 @@ export default function Monitoring() {
   const [isPredicting, setIsPredicting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   
+  // Time control state
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [timeSpeed, setTimeSpeed] = useState(60); // 60x real time by default
+  const lastUpdateRef = useRef(Date.now());
+  
   // Settings
   const [showOrbits, setShowOrbits] = useState(true);
   const [showDebris, setShowDebris] = useState(false);
+  const [showTrails, setShowTrails] = useState(true);
+  const [showTerminator, setShowTerminator] = useState(true);
   const [satelliteStyle, setSatelliteStyle] = useState<'dot' | 'sphere'>('sphere');
   const [orbitFilters, setOrbitFilters] = useState<('LEO' | 'MEO' | 'GEO' | 'HEO')[]>(['LEO', 'MEO', 'GEO', 'HEO']);
 
-  // Load TLE data
+  // Load TLE data and satellite database
   useEffect(() => {
-    const loadSatellites = async () => {
+    const loadData = async () => {
       setIsLoading(true);
       try {
+        // Load satellite metadata database
+        const metadataDb = await loadSatelliteDatabase();
+        
         const parsed = await parseTLEFile('/satellite_data.txt');
         
-        // Convert to SatelliteData format and initialize (increased to 2000 for more satellites)
+        // Convert to SatelliteData format with metadata
         const satData: SatelliteData[] = parsed.slice(0, 2000).map((p) => {
+          const metadata = metadataDb.get(p.noradId);
+          
           const sat: SatelliteData = {
             id: p.id,
             name: p.name,
@@ -53,6 +68,13 @@ export default function Monitoring() {
             tle2: p.tle2,
             orbitType: p.orbitType,
             inclination: p.inclination,
+            // Add metadata from database
+            country: metadata?.countryOperator || metadata?.countryRegistry || undefined,
+            launchDate: metadata?.launchDate || undefined,
+            purpose: metadata?.purpose || undefined,
+            operator: metadata?.operator || undefined,
+            launchSite: metadata?.launchSite || undefined,
+            launchVehicle: metadata?.launchVehicle || undefined,
           };
           return initializeSatellite(sat);
         });
@@ -71,12 +93,12 @@ export default function Monitoring() {
         setAllSatellites(satData);
         setSatellites(satData);
       } catch (error) {
-        console.error('Failed to load TLE data:', error);
+        console.error('Failed to load data:', error);
       }
       setIsLoading(false);
     };
     
-    loadSatellites();
+    loadData();
   }, []);
 
   // Filter satellites by orbit type
@@ -96,19 +118,30 @@ export default function Monitoring() {
     };
   }, [allSatellites]);
 
-  // Propagate positions
-  const updatePositions = useCallback(() => {
-    const now = new Date();
-    setSatellites((sats) => sats.map((sat) => propagateSatellite(sat, now)));
-  }, []);
+  // Update time based on play state and speed
+  useEffect(() => {
+    if (!isPlaying) return;
+    
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const delta = now - lastUpdateRef.current;
+      lastUpdateRef.current = now;
+      
+      setCurrentTime(prev => new Date(prev.getTime() + delta * timeSpeed));
+    }, 100); // Update every 100ms for smooth animation
+    
+    return () => clearInterval(interval);
+  }, [isPlaying, timeSpeed]);
 
-  // Update positions periodically
+  // Propagate positions based on current simulation time
+  const updatePositions = useCallback(() => {
+    setSatellites((sats) => sats.map((sat) => propagateSatellite(sat, currentTime)));
+  }, [currentTime]);
+
+  // Update positions when time changes significantly
   useEffect(() => {
     if (allSatellites.length === 0) return;
-    
     updatePositions();
-    const interval = setInterval(updatePositions, 1000);
-    return () => clearInterval(interval);
   }, [updatePositions, allSatellites.length]);
 
   // Detect real-time collisions
@@ -129,7 +162,6 @@ export default function Monitoring() {
   const handlePredict24Hours = useCallback(async () => {
     setIsPredicting(true);
     
-    // Run in chunks to not block UI
     setTimeout(() => {
       const predictions = predictCollisions24Hours(filteredSatellites.slice(0, 200), 50);
       setPredictedCollisions(predictions);
@@ -146,6 +178,16 @@ export default function Monitoring() {
       }
     }
   }, [satellites, selectedSatellite?.id]);
+
+  const handleTimeChange = (newTime: Date) => {
+    setCurrentTime(newTime);
+    lastUpdateRef.current = Date.now();
+  };
+
+  const handlePlayPause = () => {
+    setIsPlaying(!isPlaying);
+    lastUpdateRef.current = Date.now();
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -211,14 +253,29 @@ export default function Monitoring() {
                 showOrbits={showOrbits}
                 collisions={realTimeCollisions}
                 orbitFilters={orbitFilters}
+                currentTime={currentTime}
+                showTrails={showTrails}
+                showTerminator={showTerminator}
               />
               
               <StatsOverlay
                 totalSatellites={allSatellites.length}
                 visibleSatellites={filteredSatellites.length}
                 collisions={realTimeCollisions}
-                isLive={true}
+                isLive={isPlaying}
               />
+              
+              {/* Time Control Overlay */}
+              <div className="absolute bottom-4 left-4 right-4 max-w-lg mx-auto">
+                <TimeControl
+                  currentTime={currentTime}
+                  onTimeChange={handleTimeChange}
+                  isPlaying={isPlaying}
+                  onPlayPause={handlePlayPause}
+                  speed={timeSpeed}
+                  onSpeedChange={setTimeSpeed}
+                />
+              </div>
             </>
           )}
         </div>
@@ -232,6 +289,10 @@ export default function Monitoring() {
             setShowDebris={setShowDebris}
             satelliteStyle={satelliteStyle}
             setSatelliteStyle={setSatelliteStyle}
+            showTrails={showTrails}
+            setShowTrails={setShowTrails}
+            showTerminator={showTerminator}
+            setShowTerminator={setShowTerminator}
           />
           
           <CollisionPanel
