@@ -19,6 +19,11 @@ export interface SatelliteData {
   launchDate?: string;
   satrec?: satellite.SatRec;
   orbitType?: 'LEO' | 'MEO' | 'GEO' | 'HEO';
+  // Extended metadata from database
+  purpose?: string;
+  operator?: string;
+  launchSite?: string;
+  launchVehicle?: string;
 }
 
 export interface DebrisData {
