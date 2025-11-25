@@ -43,8 +43,8 @@ export default function Monitoring() {
       try {
         const parsed = await parseTLEFile('/satellite_data.txt');
         
-        // Convert to SatelliteData format and initialize (limit to 500 for performance)
-        const satData: SatelliteData[] = parsed.slice(0, 500).map((p) => {
+        // Convert to SatelliteData format and initialize (increased to 2000 for more satellites)
+        const satData: SatelliteData[] = parsed.slice(0, 2000).map((p) => {
           const sat: SatelliteData = {
             id: p.id,
             name: p.name,
