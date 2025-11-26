@@ -1,4 +1,5 @@
-import { useMemo } from 'react';
+import { useMemo, useRef, useEffect } from 'react';
+import { Line } from '@react-three/drei';
 import * as THREE from 'three';
 
 interface DayNightTerminatorProps {
@@ -46,29 +47,30 @@ export default function DayNightTerminator({ currentTime, earthRadius }: DayNigh
     return { sunDirection: sunDir, terminatorPoints: points };
   }, [currentTime, earthRadius]);
   
+  const sunPosition = useMemo(() => 
+    sunDirection.clone().multiplyScalar(earthRadius * 3),
+    [sunDirection, earthRadius]
+  );
+  
   return (
     <group>
-      {/* Terminator line */}
-      <line>
-        <bufferGeometry>
-          <bufferAttribute
-            attach="attributes-position"
-            count={terminatorPoints.length}
-            array={new Float32Array(terminatorPoints.flatMap(p => [p.x, p.y, p.z]))}
-            itemSize={3}
-          />
-        </bufferGeometry>
-        <lineBasicMaterial color="#ff6b35" linewidth={2} transparent opacity={0.8} />
-      </line>
+      {/* Terminator line using drei Line component */}
+      <Line
+        points={terminatorPoints}
+        color="#ff6b35"
+        lineWidth={2}
+        transparent
+        opacity={0.8}
+      />
       
       {/* Sun indicator - distant light source direction */}
-      <mesh position={sunDirection.clone().multiplyScalar(earthRadius * 3)}>
+      <mesh position={sunPosition}>
         <sphereGeometry args={[0.3, 16, 16]} />
         <meshBasicMaterial color="#ffdd44" />
       </mesh>
       
       {/* Sun glow */}
-      <mesh position={sunDirection.clone().multiplyScalar(earthRadius * 3)}>
+      <mesh position={sunPosition}>
         <sphereGeometry args={[0.6, 16, 16]} />
         <meshBasicMaterial color="#ffdd44" transparent opacity={0.3} />
       </mesh>
