@@ -4,26 +4,14 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Progress } from '@/components/ui/progress';
-import { AlertTriangle, Clock, Loader2, Zap, Gauge, AlertCircle, Activity, Settings2 } from 'lucide-react';
-import { 
-  CollisionRisk, 
-  getRiskColor, 
-  getProbabilityColor, 
-  formatProbability,
-  CoverageMode,
-  COVERAGE_CONFIGS,
-  PredictionProgress
-} from '@/lib/collision-detector';
+import { AlertTriangle, Clock, Loader2, Zap, Gauge, AlertCircle, Activity } from 'lucide-react';
+import { CollisionRisk, getRiskColor, getProbabilityColor, formatProbability } from '@/lib/collision-detector';
 
 interface CollisionPanelProps {
   realTimeCollisions: CollisionRisk[];
   predictedCollisions: CollisionRisk[];
   isLoading: boolean;
-  onPredict24Hours: (coverageMode: CoverageMode) => void;
-  predictionProgress?: PredictionProgress | null;
-  totalSatellites?: number;
+  onPredict24Hours: () => void;
 }
 
 export default function CollisionPanel({
@@ -31,19 +19,11 @@ export default function CollisionPanel({
   predictedCollisions,
   isLoading,
   onPredict24Hours,
-  predictionProgress,
-  totalSatellites = 0,
 }: CollisionPanelProps) {
   const [showPredicted, setShowPredicted] = useState(false);
-  const [coverageMode, setCoverageMode] = useState<CoverageMode>('standard');
   
   const criticalCount = realTimeCollisions.filter(c => c.riskLevel === 'critical').length;
   const highCount = realTimeCollisions.filter(c => c.riskLevel === 'high').length;
-  
-  const config = COVERAGE_CONFIGS[coverageMode];
-  const effectiveSatellites = coverageMode === 'full' 
-    ? totalSatellites 
-    : Math.min(config.satelliteLimit, totalSatellites);
   
   return (
     <Card className="bg-card/50 backdrop-blur-sm border-border">
@@ -94,57 +74,8 @@ export default function CollisionPanel({
         
         {/* 24-hour prediction */}
         <div className="border-t border-border pt-4">
-          {/* Coverage Mode Selector */}
-          <div className="mb-3">
-            <div className="flex items-center gap-2 mb-2">
-              <Settings2 className="w-4 h-4 text-muted-foreground" />
-              <span className="text-xs font-medium text-muted-foreground">Coverage Mode</span>
-            </div>
-            <Select 
-              value={coverageMode} 
-              onValueChange={(v) => setCoverageMode(v as CoverageMode)}
-              disabled={isLoading}
-            >
-              <SelectTrigger className="w-full h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(COVERAGE_CONFIGS).map(([key, cfg]) => (
-                  <SelectItem key={key} value={key} className="text-xs">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{cfg.label}</span>
-                      <span className="text-muted-foreground">- {cfg.description}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground mt-1">
-              Analyzing {effectiveSatellites.toLocaleString()} of {totalSatellites.toLocaleString()} satellites
-            </p>
-          </div>
-          
-          {/* Progress indicator */}
-          {isLoading && predictionProgress && (
-            <div className="mb-3 space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground capitalize">
-                  {predictionProgress.phase === 'filtering' && 'Pre-filtering orbits...'}
-                  {predictionProgress.phase === 'coarse' && 'Coarse scan (15-min intervals)...'}
-                  {predictionProgress.phase === 'refining' && 'Fine refinement...'}
-                  {predictionProgress.phase === 'complete' && 'Complete'}
-                </span>
-                <span className="text-primary font-mono">{predictionProgress.progress}%</span>
-              </div>
-              <Progress value={predictionProgress.progress} className="h-1.5" />
-              <p className="text-xs text-muted-foreground">
-                {predictionProgress.message}
-              </p>
-            </div>
-          )}
-          
           <Button
-            onClick={() => onPredict24Hours(coverageMode)}
+            onClick={onPredict24Hours}
             disabled={isLoading}
             variant="outline"
             className="w-full mb-3"
@@ -152,7 +83,7 @@ export default function CollisionPanel({
             {isLoading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Analyzing...
+                Analyzing (fine resolution)...
               </>
             ) : (
               <>

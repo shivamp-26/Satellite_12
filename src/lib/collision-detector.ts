@@ -21,55 +21,6 @@ export interface CollisionRisk {
   missDistanceCrossTrack?: number; // km
 }
 
-export type CoverageMode = 'fast' | 'standard' | 'comprehensive' | 'full';
-
-export interface CoverageConfig {
-  mode: CoverageMode;
-  satelliteLimit: number;
-  pairLimit: number;
-  label: string;
-  description: string;
-}
-
-export const COVERAGE_CONFIGS: Record<CoverageMode, CoverageConfig> = {
-  fast: {
-    mode: 'fast',
-    satelliteLimit: 500,
-    pairLimit: 5000,
-    label: 'Fast',
-    description: '~500 satellites, quick scan'
-  },
-  standard: {
-    mode: 'standard',
-    satelliteLimit: 2000,
-    pairLimit: 15000,
-    label: 'Standard',
-    description: '~2,000 satellites'
-  },
-  comprehensive: {
-    mode: 'comprehensive',
-    satelliteLimit: 5000,
-    pairLimit: 50000,
-    label: 'Comprehensive',
-    description: '~5,000 satellites'
-  },
-  full: {
-    mode: 'full',
-    satelliteLimit: Infinity,
-    pairLimit: 200000,
-    label: 'Full',
-    description: 'All satellites (slower)'
-  }
-};
-
-export interface PredictionProgress {
-  phase: 'filtering' | 'coarse' | 'refining' | 'complete';
-  progress: number; // 0-100
-  pairsChecked: number;
-  candidatesFound: number;
-  message: string;
-}
-
 const SCALE_FACTOR = 1 / 1000;
 const COLLISION_RADIUS = 0.01; // 10m combined object radius in km
 
@@ -233,103 +184,11 @@ export function detectRealTimeCollisions(
   return collisions.sort((a, b) => a.distance - b.distance);
 }
 
-// Orbital pre-filtering: check if two satellites can possibly intersect
-function canOrbitsIntersect(sat1: SatelliteData, sat2: SatelliteData): boolean {
-  const alt1 = sat1.altitude || 400;
-  const alt2 = sat2.altitude || 400;
-  
-  // Get orbital parameters from satrec if available
-  const ecc1 = sat1.satrec?.ecco || 0;
-  const ecc2 = sat2.satrec?.ecco || 0;
-  
-  // Calculate approximate perigee and apogee altitudes
-  const earthRadius = 6371; // km
-  const sma1 = alt1 + earthRadius;
-  const sma2 = alt2 + earthRadius;
-  
-  const perigee1 = sma1 * (1 - ecc1) - earthRadius;
-  const apogee1 = sma1 * (1 + ecc1) - earthRadius;
-  const perigee2 = sma2 * (1 - ecc2) - earthRadius;
-  const apogee2 = sma2 * (1 + ecc2) - earthRadius;
-  
-  // Add margin for uncertainty (200 km)
-  const margin = 200;
-  
-  // Check if altitude ranges overlap
-  const rangeOverlap = (perigee1 - margin) <= (apogee2 + margin) && 
-                       (perigee2 - margin) <= (apogee1 + margin);
-  
-  if (!rangeOverlap) return false;
-  
-  // Check inclination compatibility (satellites with very different inclinations 
-  // at similar altitudes are less likely to intersect)
-  const inc1 = sat1.inclination || 0;
-  const inc2 = sat2.inclination || 0;
-  const incDiff = Math.abs(inc1 - inc2);
-  
-  // If altitudes are very similar but inclinations are very different, they might not intersect
-  const altDiff = Math.abs(alt1 - alt2);
-  if (altDiff < 50 && incDiff > 60) {
-    return false;
-  }
-  
-  return true;
-}
-
-// Two-phase collision prediction with fine time steps and progress reporting
+// Two-phase collision prediction with fine time steps
 export function predictCollisions24Hours(
   satellites: SatelliteData[],
-  thresholdKm: number = 50,
-  coverageMode: CoverageMode = 'standard',
-  onProgress?: (progress: PredictionProgress) => void
+  thresholdKm: number = 50
 ): CollisionRisk[] {
-  const config = COVERAGE_CONFIGS[coverageMode];
-  const now = new Date();
-  
-  // Report filtering phase start
-  onProgress?.({
-    phase: 'filtering',
-    progress: 0,
-    pairsChecked: 0,
-    candidatesFound: 0,
-    message: 'Applying orbital pre-filtering...'
-  });
-  
-  // Apply satellite limit based on coverage mode
-  const limitedSatellites = satellites.slice(0, config.satelliteLimit);
-  
-  // === PRE-FILTERING PHASE: Build candidate pairs using orbital filtering ===
-  const candidatePairs: Array<{ sat1: SatelliteData; sat2: SatelliteData }> = [];
-  let totalPossiblePairs = 0;
-  
-  for (let i = 0; i < limitedSatellites.length; i++) {
-    for (let j = i + 1; j < limitedSatellites.length; j++) {
-      totalPossiblePairs++;
-      const sat1 = limitedSatellites[i];
-      const sat2 = limitedSatellites[j];
-      
-      if (!sat1.satrec || !sat2.satrec) continue;
-      
-      // Apply orbital pre-filtering
-      if (canOrbitsIntersect(sat1, sat2)) {
-        candidatePairs.push({ sat1, sat2 });
-      }
-      
-      // Limit pairs based on coverage mode
-      if (candidatePairs.length >= config.pairLimit) break;
-    }
-    if (candidatePairs.length >= config.pairLimit) break;
-  }
-  
-  onProgress?.({
-    phase: 'filtering',
-    progress: 100,
-    pairsChecked: totalPossiblePairs,
-    candidatesFound: candidatePairs.length,
-    message: `Filtered to ${candidatePairs.length.toLocaleString()} candidate pairs`
-  });
-  
-  // === PHASE 1: Coarse Scan (15-minute intervals) ===
   const candidates: Map<string, {
     sat1: SatelliteData;
     sat2: SatelliteData;
@@ -337,86 +196,66 @@ export function predictCollisions24Hours(
     coarseTime: Date;
   }> = new Map();
   
+  const now = new Date();
   const screeningThreshold = 100; // km - wider threshold for Phase 1
+  
+  // === PHASE 1: Coarse Scan (15-minute intervals) ===
   const coarseSteps = 96; // Every 15 minutes for 24 hours
   const coarseStepMs = (24 * 60 * 60 * 1000) / coarseSteps;
   
-  for (let pairIdx = 0; pairIdx < candidatePairs.length; pairIdx++) {
-    const { sat1, sat2 } = candidatePairs[pairIdx];
-    
-    // Report progress every 100 pairs
-    if (pairIdx % 100 === 0) {
-      onProgress?.({
-        phase: 'coarse',
-        progress: Math.round((pairIdx / candidatePairs.length) * 100),
-        pairsChecked: pairIdx,
-        candidatesFound: candidates.size,
-        message: `Coarse scan: ${pairIdx.toLocaleString()}/${candidatePairs.length.toLocaleString()} pairs`
-      });
-    }
-    
-    let minDistance = Infinity;
-    let minTime = now;
-    
-    // Coarse scan
-    for (let k = 0; k < coarseSteps; k++) {
-      const time = new Date(now.getTime() + k * coarseStepMs);
+  // Limit satellite pairs for performance
+  const maxPairs = 10000;
+  let pairCount = 0;
+  
+  for (let i = 0; i < satellites.length && pairCount < maxPairs; i++) {
+    for (let j = i + 1; j < satellites.length && pairCount < maxPairs; j++) {
+      pairCount++;
       
-      const prop1 = propagateSatellite(sat1, time);
-      const prop2 = propagateSatellite(sat2, time);
+      const sat1 = satellites[i];
+      const sat2 = satellites[j];
       
-      if (!prop1.position || !prop2.position) continue;
+      if (!sat1.satrec || !sat2.satrec) continue;
       
-      const dx = (prop1.position.x - prop2.position.x) / SCALE_FACTOR;
-      const dy = (prop1.position.y - prop2.position.y) / SCALE_FACTOR;
-      const dz = (prop1.position.z - prop2.position.z) / SCALE_FACTOR;
-      const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      let minDistance = Infinity;
+      let minTime = now;
       
-      if (distance < minDistance) {
-        minDistance = distance;
-        minTime = time;
+      // Coarse scan
+      for (let k = 0; k < coarseSteps; k++) {
+        const time = new Date(now.getTime() + k * coarseStepMs);
+        
+        const prop1 = propagateSatellite(sat1, time);
+        const prop2 = propagateSatellite(sat2, time);
+        
+        if (!prop1.position || !prop2.position) continue;
+        
+        const dx = (prop1.position.x - prop2.position.x) / SCALE_FACTOR;
+        const dy = (prop1.position.y - prop2.position.y) / SCALE_FACTOR;
+        const dz = (prop1.position.z - prop2.position.z) / SCALE_FACTOR;
+        const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        
+        if (distance < minDistance) {
+          minDistance = distance;
+          minTime = time;
+        }
       }
-    }
-    
-    // Add to candidates if within screening threshold
-    if (minDistance < screeningThreshold) {
-      const pairId = `${sat1.id}-${sat2.id}`;
-      candidates.set(pairId, {
-        sat1,
-        sat2,
-        coarseMinDistance: minDistance,
-        coarseTime: minTime,
-      });
+      
+      // Add to candidates if within screening threshold
+      if (minDistance < screeningThreshold) {
+        const pairId = `${sat1.id}-${sat2.id}`;
+        candidates.set(pairId, {
+          sat1,
+          sat2,
+          coarseMinDistance: minDistance,
+          coarseTime: minTime,
+        });
+      }
     }
   }
   
-  onProgress?.({
-    phase: 'coarse',
-    progress: 100,
-    pairsChecked: candidatePairs.length,
-    candidatesFound: candidates.size,
-    message: `Found ${candidates.size} close approach candidates`
-  });
-  
   // === PHASE 2: Fine Refinement ===
   const collisions: CollisionRisk[] = [];
-  let refinedCount = 0;
-  const totalCandidates = candidates.size;
   
   for (const [pairId, candidate] of candidates) {
-    refinedCount++;
-    
-    // Report progress
-    if (refinedCount % 10 === 0) {
-      onProgress?.({
-        phase: 'refining',
-        progress: Math.round((refinedCount / totalCandidates) * 100),
-        pairsChecked: candidatePairs.length,
-        candidatesFound: collisions.length,
-        message: `Fine refinement: ${refinedCount}/${totalCandidates} candidates`
-      });
-    }
-    
     const { sat1, sat2, coarseTime } = candidate;
     
     // Refine with 1-minute intervals (±30 minutes around coarse minimum)
@@ -537,15 +376,7 @@ export function predictCollisions24Hours(
     }
   }
   
-  onProgress?.({
-    phase: 'complete',
-    progress: 100,
-    pairsChecked: candidatePairs.length,
-    candidatesFound: collisions.length,
-    message: `Complete: ${collisions.length} collision risks found`
-  });
-  
-  return collisions.sort((a, b) => a.distance - b.distance).slice(0, 100);
+  return collisions.sort((a, b) => a.distance - b.distance).slice(0, 50);
 }
 
 function getRiskLevel(distanceKm: number): 'low' | 'medium' | 'high' | 'critical' {
