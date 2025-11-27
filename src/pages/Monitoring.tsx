@@ -19,7 +19,9 @@ import { parseTLEFile, classifyOrbit } from "@/lib/tle-parser";
 import { 
   CollisionRisk, 
   detectRealTimeCollisions, 
-  predictCollisions24Hours 
+  predictCollisions24Hours,
+  CoverageMode,
+  PredictionProgress
 } from "@/lib/collision-detector";
 import { loadSatelliteDatabase, getSatelliteMetadata } from "@/lib/satellite-database";
 
@@ -30,6 +32,7 @@ export default function Monitoring() {
   const [realTimeCollisions, setRealTimeCollisions] = useState<CollisionRisk[]>([]);
   const [predictedCollisions, setPredictedCollisions] = useState<CollisionRisk[]>([]);
   const [isPredicting, setIsPredicting] = useState(false);
+  const [predictionProgress, setPredictionProgress] = useState<PredictionProgress | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   
   // Time control state
@@ -46,7 +49,7 @@ export default function Monitoring() {
   const [satelliteStyle, setSatelliteStyle] = useState<'dot' | 'sphere'>('sphere');
   const [orbitFilters, setOrbitFilters] = useState<('LEO' | 'MEO' | 'GEO' | 'HEO')[]>(['LEO', 'MEO', 'GEO', 'HEO']);
 
-  // Load TLE data and satellite database
+  // Load TLE data and satellite database - ALL satellites
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
@@ -56,8 +59,8 @@ export default function Monitoring() {
         
         const parsed = await parseTLEFile('/satellite_data.txt');
         
-        // Convert to SatelliteData format with metadata
-        const satData: SatelliteData[] = parsed.slice(0, 2000).map((p) => {
+        // Convert ALL satellites to SatelliteData format with metadata (no slice limit)
+        const satData: SatelliteData[] = parsed.map((p) => {
           const metadata = metadataDb.get(p.noradId);
           
           const sat: SatelliteData = {
@@ -90,6 +93,7 @@ export default function Monitoring() {
           }
         });
         
+        console.log(`Loaded ${satData.length} satellites for collision detection`);
         setAllSatellites(satData);
         setSatellites(satData);
       } catch (error) {
@@ -158,14 +162,24 @@ export default function Monitoring() {
     return () => clearInterval(interval);
   }, [filteredSatellites]);
 
-  // Handle 24-hour prediction
-  const handlePredict24Hours = useCallback(async () => {
+  // Handle 24-hour prediction with configurable coverage
+  const handlePredict24Hours = useCallback(async (coverageMode: CoverageMode) => {
     setIsPredicting(true);
+    setPredictionProgress(null);
     
+    // Use setTimeout to allow UI to update before heavy computation
     setTimeout(() => {
-      const predictions = predictCollisions24Hours(filteredSatellites.slice(0, 200), 50);
+      const predictions = predictCollisions24Hours(
+        filteredSatellites, 
+        50,
+        coverageMode,
+        (progress) => {
+          setPredictionProgress(progress);
+        }
+      );
       setPredictedCollisions(predictions);
       setIsPredicting(false);
+      setPredictionProgress(null);
     }, 100);
   }, [filteredSatellites]);
 
@@ -300,6 +314,8 @@ export default function Monitoring() {
             predictedCollisions={predictedCollisions}
             isLoading={isPredicting}
             onPredict24Hours={handlePredict24Hours}
+            predictionProgress={predictionProgress}
+            totalSatellites={allSatellites.length}
           />
         </aside>
       </main>
