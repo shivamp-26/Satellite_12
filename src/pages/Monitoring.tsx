@@ -2,6 +2,11 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Satellite, Loader2, PanelRightOpen, PanelRightClose } from "lucide-react";
+import {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
+} from "@/components/ui/resizable";
 import Earth3DEnhanced from "@/components/monitoring/Earth3DEnhanced";
 import SatellitePanel from "@/components/monitoring/SatellitePanel";
 import SettingsPanel from "@/components/monitoring/SettingsPanel";
@@ -225,87 +230,110 @@ export default function Monitoring() {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="pt-16 h-screen flex">
-        {/* Left Sidebar */}
-        <aside className="w-80 h-[calc(100vh-4rem)] overflow-y-auto p-4 space-y-4 border-r border-border bg-card/30">
-          <SatelliteSearch
-            satellites={filteredSatellites}
-            onSelect={setSelectedSatellite}
-            selectedId={selectedSatellite?.id}
-          />
-          
-          <OrbitFilter
-            filters={orbitFilters}
-            onChange={setOrbitFilters}
-            counts={orbitCounts}
-          />
-          
-          <SatellitePanel satellite={selectedSatellite} />
-        </aside>
-
-        {/* 3D Globe */}
-        <div className="flex-1 relative">
-          {isLoading ? (
-            <div className="w-full h-full flex items-center justify-center">
-              <div className="text-center">
-                <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
-                <p className="text-muted-foreground">Loading satellite data...</p>
-              </div>
-            </div>
-          ) : (
-            <>
-              <Earth3DEnhanced
+      {/* Main Content with Resizable Panels */}
+      <main className="pt-16 h-screen">
+        <ResizablePanelGroup direction="horizontal" className="h-[calc(100vh-4rem)]">
+          {/* Left Sidebar - Resizable */}
+          <ResizablePanel 
+            defaultSize={22} 
+            minSize={15} 
+            maxSize={35}
+            className="bg-card/30"
+          >
+            <div className="h-full overflow-y-auto p-4 space-y-4 border-r border-border">
+              <SatelliteSearch
                 satellites={filteredSatellites}
-                selectedSatellite={selectedSatellite}
-                onSelectSatellite={setSelectedSatellite}
-                showOrbits={showOrbits}
-                collisions={realTimeCollisions}
-                orbitFilters={orbitFilters}
-                currentTime={currentTime}
-                showTrails={showTrails}
-                showTerminator={showTerminator}
+                onSelect={setSelectedSatellite}
+                selectedId={selectedSatellite?.id}
               />
               
-              <StatsOverlay
-                totalSatellites={allSatellites.length}
-                visibleSatellites={filteredSatellites.length}
-                collisions={realTimeCollisions}
-                isLive={isPlaying}
+              <OrbitFilter
+                filters={orbitFilters}
+                onChange={setOrbitFilters}
+                counts={orbitCounts}
               />
               
-              {/* Time Control Overlay */}
-              <div className="absolute bottom-4 left-4 right-4 max-w-lg mx-auto">
-                <TimeControl
-                  currentTime={currentTime}
-                  onTimeChange={handleTimeChange}
-                  isPlaying={isPlaying}
-                  onPlayPause={handlePlayPause}
-                  speed={timeSpeed}
-                  onSpeedChange={setTimeSpeed}
-                />
-              </div>
+              <SatellitePanel satellite={selectedSatellite} />
+            </div>
+          </ResizablePanel>
+
+          <ResizableHandle withHandle className="bg-border hover:bg-primary/50 transition-colors" />
+
+          {/* 3D Globe - Center Panel */}
+          <ResizablePanel defaultSize={showRightSidebar ? 56 : 78} minSize={40}>
+            <div className="h-full relative">
+              {isLoading ? (
+                <div className="w-full h-full flex items-center justify-center">
+                  <div className="text-center">
+                    <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
+                    <p className="text-muted-foreground">Loading satellite data...</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <Earth3DEnhanced
+                    satellites={filteredSatellites}
+                    selectedSatellite={selectedSatellite}
+                    onSelectSatellite={setSelectedSatellite}
+                    showOrbits={showOrbits}
+                    collisions={realTimeCollisions}
+                    orbitFilters={orbitFilters}
+                    currentTime={currentTime}
+                    showTrails={showTrails}
+                    showTerminator={showTerminator}
+                  />
+                  
+                  <StatsOverlay
+                    totalSatellites={allSatellites.length}
+                    visibleSatellites={filteredSatellites.length}
+                    collisions={realTimeCollisions}
+                    isLive={isPlaying}
+                  />
+                  
+                  {/* Time Control Overlay */}
+                  <div className="absolute bottom-4 left-4 right-4 max-w-lg mx-auto">
+                    <TimeControl
+                      currentTime={currentTime}
+                      onTimeChange={handleTimeChange}
+                      isPlaying={isPlaying}
+                      onPlayPause={handlePlayPause}
+                      speed={timeSpeed}
+                      onSpeedChange={setTimeSpeed}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          </ResizablePanel>
+
+          {/* Right Sidebar - Toggleable & Resizable */}
+          {showRightSidebar && (
+            <>
+              <ResizableHandle withHandle className="bg-border hover:bg-primary/50 transition-colors" />
+              <ResizablePanel 
+                defaultSize={22} 
+                minSize={15} 
+                maxSize={35}
+                className="bg-card/30"
+              >
+                <div className="h-full overflow-y-auto p-4 space-y-4 border-l border-border animate-in slide-in-from-right duration-300">
+                  <SettingsPanel
+                    showOrbits={showOrbits}
+                    setShowOrbits={setShowOrbits}
+                    showDebris={showDebris}
+                    setShowDebris={setShowDebris}
+                    showTrails={showTrails}
+                    setShowTrails={setShowTrails}
+                    showTerminator={showTerminator}
+                    setShowTerminator={setShowTerminator}
+                  />
+                  
+                  <CollisionPanel />
+                </div>
+              </ResizablePanel>
             </>
           )}
-        </div>
-
-        {/* Right Sidebar - Toggleable */}
-        {showRightSidebar && (
-          <aside className="w-80 h-[calc(100vh-4rem)] overflow-y-auto p-4 space-y-4 border-l border-border bg-card/30 animate-in slide-in-from-right duration-300">
-            <SettingsPanel
-              showOrbits={showOrbits}
-              setShowOrbits={setShowOrbits}
-              showDebris={showDebris}
-              setShowDebris={setShowDebris}
-              showTrails={showTrails}
-              setShowTrails={setShowTrails}
-              showTerminator={showTerminator}
-              setShowTerminator={setShowTerminator}
-            />
-            
-            <CollisionPanel />
-          </aside>
-        )}
+        </ResizablePanelGroup>
       </main>
     </div>
   );
