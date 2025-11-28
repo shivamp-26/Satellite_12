@@ -5,7 +5,7 @@ import { ArrowLeft, Satellite, Loader2, PanelRightOpen, PanelRightClose } from "
 import Earth3DEnhanced from "@/components/monitoring/Earth3DEnhanced";
 import SatellitePanel from "@/components/monitoring/SatellitePanel";
 import SettingsPanel from "@/components/monitoring/SettingsPanel";
-import CollisionPanelNew from "@/components/monitoring/CollisionPanelNew";
+import CollisionPanel from "@/components/monitoring/CollisionPanelNew";
 import OrbitFilter from "@/components/monitoring/OrbitFilter";
 import StatsOverlay from "@/components/monitoring/StatsOverlay";
 import SatelliteSearch from "@/components/monitoring/SatelliteSearch";
@@ -303,7 +303,7 @@ export default function Monitoring() {
               setShowTerminator={setShowTerminator}
             />
             
-            <CollisionPanelNew />
+            <CollisionPanel />
           </aside>
         )}
       </main>
