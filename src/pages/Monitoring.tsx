@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Satellite, Loader2 } from "lucide-react";
+import { ArrowLeft, Satellite, Loader2, PanelRightOpen, PanelRightClose } from "lucide-react";
 import Earth3DEnhanced from "@/components/monitoring/Earth3DEnhanced";
 import SatellitePanel from "@/components/monitoring/SatellitePanel";
 import SettingsPanel from "@/components/monitoring/SettingsPanel";
-import CollisionPanel from "@/components/monitoring/CollisionPanel";
+import CollisionPanelNew from "@/components/monitoring/CollisionPanelNew";
 import OrbitFilter from "@/components/monitoring/OrbitFilter";
 import StatsOverlay from "@/components/monitoring/StatsOverlay";
 import SatelliteSearch from "@/components/monitoring/SatelliteSearch";
@@ -19,17 +19,14 @@ import { parseTLEFile, classifyOrbit } from "@/lib/tle-parser";
 import { 
   CollisionRisk, 
   detectRealTimeCollisions, 
-  predictCollisions24Hours 
 } from "@/lib/collision-detector";
-import { loadSatelliteDatabase, getSatelliteMetadata } from "@/lib/satellite-database";
+import { loadSatelliteDatabase } from "@/lib/satellite-database";
 
 export default function Monitoring() {
   const [allSatellites, setAllSatellites] = useState<SatelliteData[]>([]);
   const [satellites, setSatellites] = useState<SatelliteData[]>([]);
   const [selectedSatellite, setSelectedSatellite] = useState<SatelliteData | null>(null);
   const [realTimeCollisions, setRealTimeCollisions] = useState<CollisionRisk[]>([]);
-  const [predictedCollisions, setPredictedCollisions] = useState<CollisionRisk[]>([]);
-  const [isPredicting, setIsPredicting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   
   // Time control state
@@ -43,8 +40,10 @@ export default function Monitoring() {
   const [showDebris, setShowDebris] = useState(false);
   const [showTrails, setShowTrails] = useState(true);
   const [showTerminator, setShowTerminator] = useState(true);
-  const [satelliteStyle, setSatelliteStyle] = useState<'dot' | 'sphere'>('sphere');
   const [orbitFilters, setOrbitFilters] = useState<('LEO' | 'MEO' | 'GEO' | 'HEO')[]>(['LEO', 'MEO', 'GEO', 'HEO']);
+  
+  // Right sidebar visibility
+  const [showRightSidebar, setShowRightSidebar] = useState(false);
 
   // Load TLE data and satellite database
   useEffect(() => {
@@ -158,17 +157,6 @@ export default function Monitoring() {
     return () => clearInterval(interval);
   }, [filteredSatellites]);
 
-  // Handle 24-hour prediction
-  const handlePredict24Hours = useCallback(async () => {
-    setIsPredicting(true);
-    
-    setTimeout(() => {
-      const predictions = predictCollisions24Hours(filteredSatellites.slice(0, 200), 50);
-      setPredictedCollisions(predictions);
-      setIsPredicting(false);
-    }, 100);
-  }, [filteredSatellites]);
-
   // Update selected satellite when positions update
   useEffect(() => {
     if (selectedSatellite) {
@@ -207,12 +195,33 @@ export default function Monitoring() {
             </div>
           </div>
           
-          {isLoading && (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span className="text-sm">Loading TLE data...</span>
-            </div>
-          )}
+          <div className="flex items-center gap-4">
+            {isLoading && (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="text-sm">Loading TLE data...</span>
+              </div>
+            )}
+            
+            <Button
+              variant={showRightSidebar ? "default" : "outline"}
+              size="sm"
+              onClick={() => setShowRightSidebar(!showRightSidebar)}
+              className="gap-2"
+            >
+              {showRightSidebar ? (
+                <>
+                  <PanelRightClose className="w-4 h-4" />
+                  Hide Panel
+                </>
+              ) : (
+                <>
+                  <PanelRightOpen className="w-4 h-4" />
+                  Collision Alerts
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -280,28 +289,23 @@ export default function Monitoring() {
           )}
         </div>
 
-        {/* Right Sidebar */}
-        <aside className="w-80 h-[calc(100vh-4rem)] overflow-y-auto p-4 space-y-4 border-l border-border bg-card/30">
-          <SettingsPanel
-            showOrbits={showOrbits}
-            setShowOrbits={setShowOrbits}
-            showDebris={showDebris}
-            setShowDebris={setShowDebris}
-            satelliteStyle={satelliteStyle}
-            setSatelliteStyle={setSatelliteStyle}
-            showTrails={showTrails}
-            setShowTrails={setShowTrails}
-            showTerminator={showTerminator}
-            setShowTerminator={setShowTerminator}
-          />
-          
-          <CollisionPanel
-            realTimeCollisions={realTimeCollisions}
-            predictedCollisions={predictedCollisions}
-            isLoading={isPredicting}
-            onPredict24Hours={handlePredict24Hours}
-          />
-        </aside>
+        {/* Right Sidebar - Toggleable */}
+        {showRightSidebar && (
+          <aside className="w-80 h-[calc(100vh-4rem)] overflow-y-auto p-4 space-y-4 border-l border-border bg-card/30 animate-in slide-in-from-right duration-300">
+            <SettingsPanel
+              showOrbits={showOrbits}
+              setShowOrbits={setShowOrbits}
+              showDebris={showDebris}
+              setShowDebris={setShowDebris}
+              showTrails={showTrails}
+              setShowTrails={setShowTrails}
+              showTerminator={showTerminator}
+              setShowTerminator={setShowTerminator}
+            />
+            
+            <CollisionPanelNew />
+          </aside>
+        )}
       </main>
     </div>
   );
