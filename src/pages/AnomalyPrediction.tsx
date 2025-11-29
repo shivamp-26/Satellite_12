@@ -248,11 +248,16 @@ const AnomalyPrediction = () => {
   const [severityFilter, setSeverityFilter] = useState<string>("all");
 
   useEffect(() => {
-    // Parse the data
+    // Parse the data with 5 second loading delay
     const parsed = parseAnomalyData(anomalyDataRaw);
-    setData(parsed);
-    setFilteredData(parsed);
-    setIsLoading(false);
+    
+    const timer = setTimeout(() => {
+      setData(parsed);
+      setFilteredData(parsed);
+      setIsLoading(false);
+    }, 5000);
+    
+    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
