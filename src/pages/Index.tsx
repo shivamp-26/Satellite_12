@@ -9,7 +9,7 @@ const Index = () => {
       <Hero />
       <Features />
       <HowItWorks />
-      <Dashboard />
+      {/* <Dashboard /> */}
     </main>
   );
 };

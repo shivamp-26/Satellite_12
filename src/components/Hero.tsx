@@ -27,20 +27,20 @@ const Hero = () => {
           {/* Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-primary/30 bg-primary/5 backdrop-blur-sm">
             <Satellite className="w-4 h-4 text-primary" />
-            <span className="text-sm font-medium text-primary">AI-Powered Anomaly Detection</span>
+            <span className="text-sm font-medium text-primary">ML-Based Anomaly Prediction</span>
           </div>
           
           {/* Main Heading */}
           <h1 className="text-5xl md:text-7xl font-bold tracking-tight">
-            Satellite Anomaly &{" "}
+            Satellite Collision &{" "}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-secondary to-primary animate-pulse">
-              Maneuver Detection
+              Anomaly Prediction
             </span>
           </h1>
           
           {/* Subheading */}
           <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            Leverage LSTM Autoencoders to predict satellite behavior, detect unannounced maneuvers, 
+            Leverage Machine Learning Models to predict satellite behavior, detect unannounced maneuvers, 
             and identify system failures before they happen.
           </p>
           

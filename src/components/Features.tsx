@@ -16,7 +16,7 @@ const features = [
   },
   {
     icon: Shield,
-    title: "Anomaly Detection",
+    title: "Anomaly Prediction",
     description: "Automatically flag unannounced maneuvers, tumbling, and system failures with high precision.",
     color: "text-success",
   },
