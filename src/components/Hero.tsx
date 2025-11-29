@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Satellite, Activity, AlertCircle } from "lucide-react";
+import { Satellite, Activity, AlertCircle, AlertTriangle } from "lucide-react";
 import heroImage from "@/assets/satellite-hero.jpg";
 
 const Hero = () => {
@@ -67,9 +67,12 @@ const Hero = () => {
                 Start Monitoring
               </Button>
             </Link>
-            <Button variant="outline" size="lg" className="text-base">
-              Learn More
-            </Button>
+            <Link to="/anomaly-prediction">
+              <Button variant="outline" size="lg" className="text-base gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                Anomaly Prediction
+              </Button>
+            </Link>
           </div>
         </div>
       </div>
